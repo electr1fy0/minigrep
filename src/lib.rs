@@ -2,42 +2,71 @@ use std::env;
 use std::error::Error;
 use std::fs;
 
+pub enum Mode {
+    Announce,
+    Find,
+}
+
 pub struct Config {
-    pub query: String,
-    pub file_path: String,
+    pub mode: Mode,
+    pub query: Option<String>,
+    pub file_path: Option<String>,
     pub case_sensitive: bool,
 }
 
 impl Config {
     pub fn new(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 3 {
+        if args.len() < 2 {
             return Err("not enough arguments");
         }
 
-        let query = args[1].clone();
-        let file_path = args[2].clone();
-        let case_sensitive = env::var("CASE_INSENSITIVE").is_err();
+        let mode = match args[1].as_str() {
+            "announce" => Mode::Announce,
+            "find" => Mode::Find,
+            _ => return Err("Invalid mode. Use 'announce' or 'find'"),
+        };
 
-        Ok(Config {
-            query,
-            file_path,
-            case_sensitive,
-        })
+        let case_sensitive = env::var("CASE_INSENSITIVE").is_err();
+        match mode {
+            Mode::Announce => Ok(Config {
+                mode,
+                query: None,
+                file_path: None,
+                case_sensitive,
+            }),
+
+            Mode::Find => Ok(Config {
+                mode,
+                query: Some(args[2].clone()),
+                file_path: Some(args[3].clone()),
+                case_sensitive,
+            }),
+        }
     }
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let contents = fs::read_to_string(config.file_path)?;
+    match config.mode {
+        Mode::Announce => {
+            println!("Meow: Preparation for future features.")
+        }
+        Mode::Find => {
+            println!("Searching for: {}", config.query.as_ref().unwrap());
+            println!("In file: {}", config.file_path.as_ref().unwrap());
 
-    let results = if config.case_sensitive {
-        search(&config.query, &contents)
-    } else {
-        search_case_insensitive(&config.query, &contents)
+            let contents = fs::read_to_string(config.file_path.unwrap())?;
+
+            let results = if config.case_sensitive {
+                search(&config.query.unwrap(), &contents)
+            } else {
+                search_case_insensitive(&config.query.unwrap(), &contents)
+            };
+
+            for line in results {
+                println!("{line}");
+            }
+        }
     };
-
-    for line in results {
-        println!("{line}");
-    }
 
     Ok(())
 }
